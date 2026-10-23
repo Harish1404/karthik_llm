@@ -6,4 +6,4 @@ uvicorn
 google-genai
 groq
 
-
+python-multipart
