@@ -1,9 +1,9 @@
 python-dotenv
-
 fastapi
 uvicorn
-
 google-genai
 groq
-
 python-multipart
+pymupdf
+sentence-transformers
+chromadb
