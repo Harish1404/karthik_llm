@@ -1,22 +1,45 @@
-from fastapi import APIRouter, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from pydantic import BaseModel, Field
+from app.ai.rag.pipeline import rag_pipeline
 
-router = APIRouter()
+router = APIRouter(tags=["File"])
+
+
+class RetrieveRequest(BaseModel):
+    query: str = Field(..., description="Query text to search for semantically relevant chunks")
+    n_results: int = Field(5, ge=1, le=50, description="Number of chunks to retrieve")
+    document_id: str | None = Field(None, description="Optional document ID to restrict search to a specific document")
 
 
 @router.post("/upload")
-async def upload_file(file: UploadFile):
-    
-    binary_content = await file.read()
-    text_content = binary_content.decode("utf-8")
+@router.post("/file/upload")
+async def upload(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file format. Only PDF files are supported currently."
+        )
 
-    prompts = []
+    try:
+        return await rag_pipeline.data_ingestion(file)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process and ingest file: {str(e)}"
+        )
 
-    for line in text_content.splitlines():
-        if line.startswith("prompt:"):
-            prompt = line.removeprefix("prompt:").strip()
-            prompts.append(prompt)
 
-    return prompts
-
-
+@router.post("/retrieve")
+@router.post("/file/retrieve")
+async def retrieve_chunks(request: RetrieveRequest):
+    try:
+        return await rag_pipeline.retrieve(
+            query=request.query,
+            n_results=request.n_results,
+            document_id=request.document_id
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve chunks: {str(e)}"
+        )
